@@ -1,0 +1,92 @@
+#!/Applications/Mathematica.app/Contents/MacOS/MathematicaScript -script
+
+dats = {#[[1]], 
+    CityData[{StringReplace[#[[2]], " " -> ""], 
+      StringReplace[#[[3]], " " -> ""]}, "Coordinates"], #[[5]]} & /@ 
+  Drop[Import[
+    "https://docs.google.com/spreadsheet/ccc?key=\
+0Akjm0S39aw9ddG9CZHQtcU90empobXBMTWliTUN5MFE&output=csv", "CSV"], 
+   1]; data = 
+ Select[dats, #[[2]] =!= 
+     Missing["NotAvailable"] && #[[2]] =!= {Missing["NotAvailable"], 
+      Missing["NotAvailable"]} &];
+Needs["ComputationalGeometry`"]; 
+Dilate[{x1_, y1_}, {x0_, y0_}, d_] := {x0 - d x0 + d x1, 
+  y0 - d y0 + d y1};
+f1[d_, t_] := 
+  Block[{r = 
+     Select[d, 
+      If[#[[3]] =!= "", DateList[#[[3]]][[3]] <= t, False] &], b}, 
+   b = Complement[d, r];
+   Graphics[{Text[
+      DateString[{2012, 12, t}, {"DayName", "  ", "Month", "/", "Day",
+         "/", "YearShort"}], {-110, 27}, {Right, Center}, 
+      BaseStyle -> {FontSize -> 20}], EdgeForm[Black], White, 
+     Polygon[Reverse /@ 
+       First[CountryData["UnitedStates", "Coordinates"]]], 
+     Polygon[Reverse /@ 
+       First[CountryData["PuertoRico", "Coordinates"]]], 
+     EdgeForm[White], FaceForm[Gray], 
+     Disk[#, 0.5] & /@ Reverse /@ (#[[2]] &) /@ b, 
+     FaceForm[RGBColor[153/256, 51/256, 51/256]], 
+     Disk[#, 0.7] & /@ Reverse /@ (#[[2]] &) /@ r}, 
+    ImageSize -> 1000]];
+InsideQ[poly : {({_, _}) ..}, q : {x_, y_}] /; Length[poly] >= 3 := 
+ Block[{edges = Partition[Append[poly, First[poly]], 2, 1], temp}, 
+  temp = If[#[[1, 2]] > #[[2, 2]], #, Reverse[#]] & /@ 
+    Select[edges, #[[2, 2]] =!= #[[1, 2]] && 
+       Max[#[[1, 2]], #[[2, 2]]] >= y && 
+       Min[#[[1, 2]], #[[2, 2]]] < y &];
+  OddQ[Count[temp, 
+    e_ /; Det[Append[#, 1] & /@ Append[e, q]] > 
+      0]]];(*based on \
+http://www.mathematica-users.org/webMathematica/wiki/wiki.jsp?\
+pageName=Notebook:PointInsidePolygon.nb*)
+
+f2[d_, t_] := 
+ Block[{diagram = VoronoiDiagram[Reverse[#[[2]]] & /@ d], polygons, 
+   reds, grays, 
+   refpoly = 
+    Dilate[#[[1]], {-97, 38}, 1.25] & /@ 
+     Partition[
+      Reverse /@ First[CountryData["UnitedStates", "Coordinates"]], 
+      100]}, polygons = 
+   Reap[Sow[#, 
+        FreeQ[Head /@ #[[2]], 
+         Ray]] & /@ ({#[[1]], (diagram[[1]][[#]] & /@ #[[2]])} & /@ 
+        diagram[[2]]), True][[2, 1]];
+  reds = Pick[polygons, 
+    With[{date = d[[#[[1]], 3]]}, 
+       If[date =!= "", DateList[date][[3]] < t, False]] & /@ 
+     polygons]; grays = Complement[polygons, reds];
+  Graphics[
+   Join[{Text[
+      DateString[{2012, 12, t}, {"DayName", "  ", "Month", "/", "Day",
+         "/", "YearShort"}], {-110, 27}, {Right, Center}, 
+      BaseStyle -> {FontSize -> 20}], EdgeForm[Black], White, 
+     Polygon[Reverse /@ 
+       First[CountryData["UnitedStates", "Coordinates"]]], 
+     FaceForm[Gray]}, 
+    Polygon /@ (Select[#[[2]], InsideQ[refpoly, #] &] & /@ 
+       grays), {FaceForm[RGBColor[153/256, 51/256, 51/256]]}, 
+    Polygon /@ (Select[#[[2]], InsideQ[refpoly, #] &] & /@ reds)], 
+   ImageSize -> 1000]];
+Export["~/tubes/bad.txt", #[[1]] & /@ Complement[dats, data]];
+Export["~/tubes/still.png", 
+  Graphics[{EdgeForm[Black], White, 
+    Polygon[Reverse /@ 
+      First[CountryData["UnitedStates", "Coordinates"]]], 
+    FaceForm[RGBColor[0.2, 0.2, 0.2, 0.9]], 
+    Disk[#, 0.5] & /@ 
+     Reverse /@ (#[[2]] &) /@ Select[data, #[[3]] == "" &], 
+    Table[{FaceForm[RGBColor[1 - i/8, 0, i/8, 0.9]], 
+      Disk[#, 0.7] & /@ 
+       Reverse /@ (#[[2]] &) /@ 
+         Select[data, 
+          If[#[[3]] =!= "", DateList[#[[3]]][[3]] == 19 + i, 
+            False] &]}, {i, 0, 4}]}, ImageSize -> 1000]];
+Export["~/tubes/animated_points.gif", 
+ Table[f1[data, i], {i, 18, DateList[][[3]]}], 
+ "DisplayDurations" -> 1]; Export["~/tubes/animated_voronoi.gif", 
+ Table[f2[data, i], {i, 18, DateList[][[3]]}], 
+ "DisplayDurations" -> 1];

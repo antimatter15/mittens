@@ -1,0 +1,14 @@
+data = Select[{CityData[{#[[2]], #[[3]], "UnitedStates"}, 
+      "Coordinates"], #[[5]]} & /@ 
+   Drop[Import[
+     "https://docs.google.com/spreadsheet/ccc?key=\
+0Akjm0S39aw9ddG9CZHQtcU90empobXBMTWliTUN5MFE&output=csv", "CSV"], 
+    1], #[[1]] =!= Missing["NotAvailable"] && #[[2]] =!= 
+     "" &]; Graphics[{EdgeForm[Black], White, 
+  Polygon[Reverse /@ 
+    First[CountryData["UnitedStates", "Coordinates"]]], 
+  Table[{FaceForm[RGBColor[1 - i/5, 0, i/5]], 
+    Disk[#, 1] & /@ 
+     Reverse /@ 
+      First /@ Select[data, DateList[#[[2]]][[3]] == 19 + i &]}, {i, 
+    0, 4}]}]
